@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import colorchooser
 import math
 from shape_selector import setup_shape_selection
 
@@ -7,33 +8,61 @@ class DrawingApp:
         self.root = root
         self.root.title("Shape Drag Preview App")
 
+        self.menu_bar = tk.Menu(root)
+        root.config(menu=self.menu_bar)
+
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        file_menu.add_command(label="New", command=self.clear_canvas)
+        file_menu.add_command(label="Exit", command=root.quit)
+        self.menu_bar.add_cascade(label="File", menu=file_menu)
+
         self.toolbar = tk.Frame(root, pady=5)
         self.toolbar.pack(side=tk.TOP, fill=tk.X)
 
-        self.pencil_button = tk.Button(self.toolbar, text="✏️ Pencil", command=self.use_pencil)
-        self.pencil_button.pack(side=tk.LEFT, padx=5)
+        tools_frame = tk.LabelFrame(self.toolbar, text="Tools", padx=5, pady=5)
+        tools_frame.pack(side=tk.LEFT, padx=5)
 
-        self._add_rgb_inputs()
+        self.brush_size_var = tk.IntVar(value=2)
+        tk.Label(tools_frame, text="Size:").pack(side=tk.LEFT)
+        tk.OptionMenu(tools_frame, self.brush_size_var, 1, 2, 4, 8, 10).pack(side=tk.LEFT)
 
-        self.eraser_button = tk.Button(self.toolbar, text="🧽 Eraser", command=self.use_eraser)
-        self.eraser_button.pack(side=tk.LEFT, padx=5)
+        self.pencil_button = tk.Button(tools_frame, text="✏️ Pencil", command=self.use_pencil)
+        self.pencil_button.pack(side=tk.LEFT, padx=2)
 
-        self.fill_button = tk.Button(self.toolbar, text="🪣 Fill", command=self.use_fill)
-        self.fill_button.pack(side=tk.LEFT, padx=5)
+        self.eraser_button = tk.Button(tools_frame, text="🧽 Eraser", command=self.use_eraser)
+        self.eraser_button.pack(side=tk.LEFT, padx=2)
 
-        self.shape_button = tk.Button(self.toolbar, text="🔄 Shape: Circle", command=self.update_shape_button)
-        self.shape_button.pack(side=tk.LEFT, padx=5)
+        self.fill_button = tk.Button(tools_frame, text="🪣 Fill", command=self.use_fill)
+        self.fill_button.pack(side=tk.LEFT, padx=2)
 
-        self.up_button = tk.Button(self.toolbar, text="🔼 Up", command=self.add_shape_sides)
-        self.up_button.pack(side=tk.LEFT, padx=5)
+        shapes_frame = tk.LabelFrame(self.toolbar, text="Shapes", padx=5, pady=5)
+        shapes_frame.pack(side=tk.LEFT, padx=5)
 
-        self.down_button = tk.Button(self.toolbar, text="🔽 Down", command=self.remove_shape_sides)
-        self.down_button.pack(side=tk.LEFT, padx=5)
+        self.shape_button = tk.Button(shapes_frame, text="🔄 Shape: Circle", command=self.update_shape_button)
+        self.shape_button.pack(side=tk.LEFT, padx=2)
+
+        self.up_button = tk.Button(shapes_frame, text="🔼 Up", command=self.add_shape_sides)
+        self.up_button.pack(side=tk.LEFT, padx=2)
+
+        self.down_button = tk.Button(shapes_frame, text="🔽 Down", command=self.remove_shape_sides)
+        self.down_button.pack(side=tk.LEFT, padx=2)
+
+        color_frame = tk.LabelFrame(self.toolbar, text="Colors", padx=5, pady=5)
+        color_frame.pack(side=tk.LEFT, padx=5)
+
+        self.r_entry = self._add_color_input(color_frame, "R:")
+        self.g_entry = self._add_color_input(color_frame, "G:")
+        self.b_entry = self._add_color_input(color_frame, "B:")
+
+        tk.Button(color_frame, text="🎨 Set Color", command=self.set_color_from_rgb).pack(side=tk.LEFT, padx=2)
+        tk.Button(color_frame, text="🌈 Picker", command=self.pick_color).pack(side=tk.LEFT, padx=2)
+
+        select_frame = tk.LabelFrame(self.toolbar, text="Selection", padx=5, pady=5)
+        select_frame.pack(side=tk.LEFT, padx=5)
 
         self.canvas = tk.Canvas(root, bg="white", width=800, height=600)
-        self.canvas.pack()
-
-        setup_shape_selection(self.canvas, root, self.toolbar)
+        setup_shape_selection(self.canvas, root, select_frame)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
 
         self.shapes = ["Circle", "Triangle", "Square"]
         self.shape_index = 0
@@ -56,20 +85,25 @@ class DrawingApp:
         self.canvas.bind("<B3-Motion>", self.mouse_drag)
         self.canvas.bind("<ButtonRelease-1>", self.mouse_up)
         self.canvas.bind("<ButtonRelease-3>", self.mouse_up)
+        root.bind("<BackSpace>", self.delete_selected_item)
+        root.bind("<Delete>", self.delete_selected_item)
         root.bind("<Up>", self.keyboard_up)
         root.bind("<Down>", self.keyboard_down)
         root.bind("<Control-z>", self.undo)
 
-    def _add_rgb_inputs(self):
-        self.r_entry = self._add_color_input("R:")
-        self.g_entry = self._add_color_input("G:")
-        self.b_entry = self._add_color_input("B:")
-        self.color_button = tk.Button(self.toolbar, text="🎨 Set Color", command=self.set_color_from_rgb)
-        self.color_button.pack(side=tk.LEFT, padx=5)
+    def clear_canvas(self):
+        self.canvas.delete("all")
 
-    def _add_color_input(self, label):
-        tk.Label(self.toolbar, text=label).pack(side=tk.LEFT)
-        entry = tk.Entry(self.toolbar, width=4)
+    def pick_color(self):
+        color = colorchooser.askcolor(title="Choose color")[1]
+        if color:
+            self.current_color = color
+            self.eraser_mode = False
+            self.fill_mode = False
+
+    def _add_color_input(self, parent, label):
+        tk.Label(parent, text=label).pack(side=tk.LEFT)
+        entry = tk.Entry(parent, width=4)
         entry.insert(0, "0")
         entry.pack(side=tk.LEFT)
         return entry
@@ -95,20 +129,25 @@ class DrawingApp:
         except ValueError:
             print("Invalid RGB values")
 
-    def use_pencil(self):
-        if self.canvas.selection_mode: self.canvas.disable_selection_mode()
-        self.eraser_mode = False
-        self.fill_mode = False
-        self.shape_mode = False
-
     def use_eraser(self):
-        if self.canvas.selection_mode: self.canvas.disable_selection_mode()
+        if self.canvas.selection_mode:
+            self.canvas.disable_selection_mode()
         self.eraser_mode = True
         self.fill_mode = False
         self.shape_mode = False
 
+    def use_pencil(self):
+        if self.canvas.selection_mode:
+            self.canvas.disable_selection_mode()
+        self.eraser_mode = False
+        self.fill_mode = False
+        self.shape_mode = False
+        self.canvas.bind("<B1-Motion>", self.paint)
+        self.canvas.bind("<ButtonRelease-1>", self.reset)
+
     def use_fill(self):
-        if self.canvas.selection_mode: self.canvas.disable_selection_mode()
+        if self.canvas.selection_mode:
+            self.canvas.disable_selection_mode()
         self.fill_mode = True
         self.eraser_mode = False
         self.shape_mode = False
@@ -211,14 +250,18 @@ class DrawingApp:
         elif shape == "Square":
             return self.canvas.create_rectangle(x2, y2, x1, y1, fill=color if not preview else "", outline=color, dash=(4, 2) if preview else None) if self.reverse_direction else self.canvas.create_rectangle(x1, y1, x2, y2, fill=color if not preview else "", outline=color, dash=(4, 2) if preview else None)
 
-
     def paint(self, event):
         x, y = event.x, event.y
         color = self.canvas["bg"] if self.eraser_mode else self.current_color
-        width = 10 if self.eraser_mode else 2
+        width = self.brush_size_var.get()
         if self.last_x is not None and self.last_y is not None:
             self.canvas.create_line(self.last_x, self.last_y, x, y, fill=color, width=width)
         self.last_x, self.last_y = x, y
+
+    def delete_selected_item(self, event):
+        if hasattr(self.canvas, 'selected_item') and self.canvas.selected_item:
+            self.canvas.delete(self.canvas.selected_item)
+            self.canvas.selected_item = None
 
     def reset(self, event):
         self.last_x = self.last_y = None
