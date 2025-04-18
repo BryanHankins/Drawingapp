@@ -6,7 +6,7 @@ from shapes import Circle, Triangle, Square, PolygonShape
 class DrawingApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Shape Drag Preview App")
+        self.root.title("Mare Drawing App")
 
         self.menu_bar = tk.Menu(root)
         root.config(menu=self.menu_bar)
@@ -94,6 +94,11 @@ class DrawingApp:
 
         self.use_pencil()
 
+    def undo(self, event=None):
+        if self.undo_stack:
+            item = self.undo_stack.pop()
+            self.canvas.delete(item)
+
     def use_pencil(self):
         if self.canvas.selection_mode:
             self.canvas.disable_selection_mode()
@@ -157,6 +162,13 @@ class DrawingApp:
 
     def paint(self, event):
         x, y = event.x, event.y
+        if self.shape_mode:
+            self.is_dragging = True
+            self.last_x = x
+            self.last_y = y
+            self.draw_shape_preview(self.start_x, self.start_y, x, y)
+            return
+
         color = self.canvas["bg"] if self.eraser_mode else self.current_color
         width = self.brush_size_var.get()
 
@@ -189,6 +201,32 @@ class DrawingApp:
         self.last_y = y
 
     def reset(self, event):
+        if self.shape_mode and self.is_dragging:
+            self.is_dragging = False
+            if self.preview_shape:
+                self.canvas.delete(self.preview_shape)
+            if self.custom_mode:
+                shape = PolygonShape(self.current_shape_sides, self.reverse_direction)
+            else:
+                shape_type = self.shapes[self.shape_index]
+                if shape_type == "Circle":
+                    shape = Circle()
+                elif shape_type == "Triangle":
+                    shape = Triangle(self.reverse_direction)
+                elif shape_type == "Square":
+                    shape = Square(self.reverse_direction)
+            final_shape = shape.draw(
+                self.canvas,
+                self.start_x, self.start_y,
+                event.x, event.y,
+                color=self.current_color,
+                preview=False
+            )
+            if hasattr(self.canvas, 'tag_new_item'):
+                self.canvas.tag_new_item(final_shape)
+            self.undo_stack.append(final_shape)
+            return
+
         self.last_x = self.last_y = None
         if not self.eraser_mode and self.current_line_item:
             if hasattr(self.canvas, 'tag_new_item'):
@@ -202,25 +240,80 @@ class DrawingApp:
             self.canvas.delete(self.canvas.selected_item)
             self.canvas.selected_item = None
 
+    def use_shape_mode(self):
+        if self.canvas.selection_mode:
+            self.canvas.disable_selection_mode()
+        self.eraser_mode = False
+        self.fill_mode = False
+        self.shape_mode = True
+        self.canvas.bind("<B1-Motion>", self.paint)
+        self.canvas.bind("<ButtonRelease-1>", self.reset)
+
     def update_shape_button(self):
-        pass
+        self.shape_index += 1
+        if self.shape_index >= len(self.shapes):
+            self.shape_index = 0
+            self.custom_mode = True
+            self.current_shape_sides = 5
+        else:
+            self.custom_mode = False
+
+        if self.custom_mode:
+            shape_text = f"Polygon ({self.current_shape_sides} sides)"
+        else:
+            shape_text = self.shapes[self.shape_index]
+
+        self.shape_button.config(text=f"🔄 Shape: {shape_text}")
+        
+        # FIX: Ensure switching back to shape mode
+        self.use_shape_mode()
 
     def add_shape_sides(self):
-        pass
+        if not self.custom_mode:
+            return
+        self.current_shape_sides += 1
+        if self.current_shape_sides < 3:
+            self.current_shape_sides = 3
+        self.shape_button.config(text=f"🔄 Shape: Polygon ({self.current_shape_sides} sides)")
 
     def remove_shape_sides(self):
-        pass
+        if not self.custom_mode:
+            return
+        self.current_shape_sides -= 1
+        if self.current_shape_sides < 3:
+            self.current_shape_sides = 3
+        self.shape_button.config(text=f"🔄 Shape: Polygon ({self.current_shape_sides} sides)")
 
     def keyboard_up(self, event):
-        pass
+        self.reverse_direction = True
+        if self.is_dragging:
+            self.draw_shape_preview(self.start_x, self.start_y, self.last_x, self.last_y)
 
     def keyboard_down(self, event):
-        pass
+        self.reverse_direction = False
+        if self.is_dragging:
+            self.draw_shape_preview(self.start_x, self.start_y, self.last_x, self.last_y)
 
-    def undo(self, event):
-        if self.undo_stack:
-            item = self.undo_stack.pop()
-            self.canvas.delete(item)
+    def draw_shape_preview(self, x1, y1, x2, y2):
+        if self.preview_shape:
+            self.canvas.delete(self.preview_shape)
+
+        if self.custom_mode:
+            shape = PolygonShape(self.current_shape_sides, self.reverse_direction)
+        else:
+            shape_type = self.shapes[self.shape_index]
+            if shape_type == "Circle":
+                shape = Circle()
+            elif shape_type == "Triangle":
+                shape = Triangle(self.reverse_direction)
+            elif shape_type == "Square":
+                shape = Square(self.reverse_direction)
+
+        self.preview_shape = shape.draw(
+            self.canvas, x1, y1, x2, y2,
+            color=self.current_color,
+            preview=True
+        )
 
     def mouse_down(self, event):
         self.last_x = self.start_x = event.x

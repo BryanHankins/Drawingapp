@@ -17,8 +17,16 @@ def setup_shape_selection(canvas, root, toolbar):
 
     def on_click(event):
         canvas.itemconfig("movable", width=1, dash=())
-        item = canvas.find_closest(event.x, event.y)[0]
-        if canvas.type(item) in ("polygon", "oval", "rectangle", "line"):
+        closest_items = canvas.find_closest(event.x, event.y)
+        if not closest_items:
+            return
+        item = closest_items[0]
+        try:
+            item_type = canvas.type(item)
+        except tk.TclError:
+            return  # Item no longer exists
+
+        if item_type in ("polygon", "oval", "rectangle", "line"):
             canvas.itemconfig(item, width=3, dash=(2, 2))
             canvas.selected_item = item
             canvas.last_drag = (event.x, event.y)
@@ -40,7 +48,16 @@ def setup_shape_selection(canvas, root, toolbar):
         if canvas.selection_mode:
             deactivate_selection_mode()
         else:
+            deactivate_tools_if_any()
             activate_selection_mode()
+
+    def deactivate_tools_if_any():
+        # Shape mode detection toggle: you could disable other tools here
+        if hasattr(canvas, 'owner_app'):
+            app = canvas.owner_app
+            app.shape_mode = False
+            app.eraser_mode = False
+            app.fill_mode = False
 
     canvas.tag_new_item = tag_new_item
     canvas.selection_mode = False
