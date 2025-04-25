@@ -6,3 +6,5 @@ Need to fix where if pencil is clicked. then Shape is clicked It will use the sh
 Need to fix the when double clicked The current thing in the way gets selected
 need to add a layering system
 Need to redo the resize part
+
+Created mutiple new files to seperate everything to make it easier DONE
